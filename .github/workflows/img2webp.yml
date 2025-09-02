@@ -1,17 +1,13 @@
 name: Compress JPG/PNG to WEBP and Deploy
-
 on:
   push:
     branches:
       - main
-
 permissions:
   contents: write
-
 jobs:
   compress_upload:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -25,7 +21,12 @@ jobs:
           shopt -s nullglob
           for img in *.jpg *.jpeg *.png; do
             if [ -f "$img" ]; then
-              convert "$img" -resize 800x -quality 80 "webp/${img%.*}.webp"
+              filetype=$(file --brief --mime-type "$img")
+              if [[ "$filetype" == "image/jpeg" || "$filetype" == "image/png" ]]; then
+                convert "$img" -resize 800x -quality 80 "webp/${img%.*}.webp"
+              else
+                echo "Skipping unsupported file type: $img ($filetype)"
+              fi
             fi
           done
       - name: Deploy to GitHub Pages
