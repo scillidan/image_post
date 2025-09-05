@@ -14,16 +14,22 @@ jobs:
       - name: Set up ImageMagick
         run: |
           sudo apt-get update
-          sudo apt-get install -y imagemagick
-      - name: Compress JPG and PNG to WEBP
+          sudo apt-get install -y imagemagick librsvg2-bin
+      - name: Compress JPG/PNG/SVG to WEBP
         run: |
           mkdir -p webp
           shopt -s nullglob
-          for img in *.jpg *.jpeg *.png; do
+          for img in *.jpg *.jpeg *.png *.svg; do
             if [ -f "$img" ]; then
               filetype=$(file --brief --mime-type "$img")
               if [[ "$filetype" == "image/jpeg" || "$filetype" == "image/png" ]]; then
                 convert "$img" -resize 800x -quality 80 "webp/${img%.*}.webp"
+              elif [[ "$filetype" == "image/svg+xml" ]]; then
+                # Convert SVG to PNG first, then to WEBP for better control
+                tmp_png="tmp_${img%.*}.png"
+                rsvg-convert -w 800 -o "$tmp_png" "$img"
+                convert "$tmp_png" -quality 80 "webp/${img%.*}.webp"
+                rm "$tmp_png"
               else
                 echo "Skipping unsupported file type: $img ($filetype)"
               fi
