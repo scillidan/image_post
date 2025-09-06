@@ -15,24 +15,34 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick librsvg2-bin ffmpeg
+      - name: Set ImageMagick resource limits
+        run: |
+          echo "resource limits"
+          echo "memory: 2GiB"
+          echo "map: 4GiB"
+        env:
+          MAGICK_MEMORY_LIMIT: 2GiB
+          MAGICK_MAP_LIMIT: 4GiB
       - name: Compress JPG/PNG/SVG/GIF to WEBP
         run: |
           mkdir -p webp
           shopt -s nullglob
           for img in *.jpg *.jpeg *.png *.svg *.gif; do
+            # Skip if extension is webp (for safety)
+            if [[ "${img,,}" == *.webp ]]; then
+              continue
+            fi
             if [ -f "$img" ]; then
               filetype=$(file --brief --mime-type "$img")
               if [[ "$filetype" == "image/jpeg" || "$filetype" == "image/png" ]]; then
                 convert "$img" -resize 800x -quality 80 "webp/${img%.*}.webp"
               elif [[ "$filetype" == "image/svg+xml" ]]; then
-                # Convert SVG to PNG first, then to WEBP for better control
                 tmp_png="tmp_${img%.*}.png"
                 rsvg-convert -w 800 -o "$tmp_png" "$img"
                 convert "$tmp_png" -quality 80 "webp/${img%.*}.webp"
                 rm "$tmp_png"
               elif [[ "$filetype" == "image/gif" ]]; then
-                # Convert GIF to WEBP, preserving animation if possible
-                convert "$img" -coalesce -resize 800x -quality 80 "webp/${img%.*}.webp"
+                convert "$img" -coalesce -resize 800x800\> -quality 80 "webp/${img%.*}.webp"
               else
                 echo "Skipping unsupported file type: $img ($filetype)"
               fi
@@ -51,6 +61,7 @@ jobs:
 			- name: Prepare deployment directory
         run: |
           mkdir -p deploy
+          cp -r ./*.webp deploy/
           cp -r webp/* deploy/
           cp -r mp4/* deploy/
       - name: Deploy to GitHub Pages
