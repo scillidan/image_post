@@ -1,4 +1,4 @@
-name: Compress JPG/PNG to WEBP and Deploy
+name: Compress Assets and Deploy
 on:
   push:
     branches:
@@ -14,12 +14,12 @@ jobs:
       - name: Set up ImageMagick
         run: |
           sudo apt-get update
-          sudo apt-get install -y imagemagick librsvg2-bin
-      - name: Compress JPG/PNG/SVG to WEBP
+          sudo apt-get install -y imagemagick librsvg2-bin ffmpeg
+      - name: Compress JPG/PNG/SVG/GIF to WEBP
         run: |
           mkdir -p webp
           shopt -s nullglob
-          for img in *.jpg *.jpeg *.png *.svg; do
+          for img in *.jpg *.jpeg *.png *.svg *.gif; do
             if [ -f "$img" ]; then
               filetype=$(file --brief --mime-type "$img")
               if [[ "$filetype" == "image/jpeg" || "$filetype" == "image/png" ]]; then
@@ -30,14 +30,32 @@ jobs:
                 rsvg-convert -w 800 -o "$tmp_png" "$img"
                 convert "$tmp_png" -quality 80 "webp/${img%.*}.webp"
                 rm "$tmp_png"
+              elif [[ "$filetype" == "image/gif" ]]; then
+                # Convert GIF to WEBP, preserving animation if possible
+                convert "$img" -coalesce -resize 800x -quality 80 "webp/${img%.*}.webp"
               else
                 echo "Skipping unsupported file type: $img ($filetype)"
               fi
             fi
           done
+      - name: Convert GIF to MP4
+        run: |
+          mkdir -p mp4
+          shopt -s nullglob
+          for gif in *.gif; do
+            if [ -f "$gif" ]; then
+              filename="${gif%.*}"
+              ffmpeg -i "$gif" -movflags faststart -pix_fmt yuv420p -vf "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -crf 23 -preset veryslow "mp4/${filename}.mp4"
+            fi
+          done
+			- name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          cp -r webp/* deploy/
+          cp -r mp4/* deploy/
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./webp
+          publish_dir: ./deploy
           publish_branch: gh-pages
