@@ -48,7 +48,7 @@ jobs:
               ffmpeg -i "$gif" -movflags faststart -pix_fmt yuv420p -vf "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -crf 23 -preset veryslow "mp4/${filename}.mp4"
             fi
           done
-			- name: Prepare deployment directory
+      - name: Prepare deployment directory
         run: |
           mkdir -p deploy
           cp -r webp/* deploy/
